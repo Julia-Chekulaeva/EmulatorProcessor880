@@ -2,6 +2,28 @@ import java.lang.Exception
 
 class Processor {
 
+    private class ResSigns {
+        var c1: Boolean = false
+        var z: Boolean = false
+        var p: Boolean = false
+        var c2: Boolean = false
+        var s: Boolean = false
+
+        fun writeSZP(value: UByte) {
+            s = value >= 128u
+            z = value == 0u.toUByte()
+            var sum = 0
+            var value1 = value.toInt()
+            for (i in 0 until 8) {
+                sum += value1 % 2
+                value1 /= 2
+            }
+            p = sum % 2 == 0
+        }
+    }
+
+    private val resSigns = ResSigns()
+
     private var stopped = false
 
     private var SP: Int = 0
@@ -129,68 +151,6 @@ class Processor {
             portsIn[i] = 0u
             portsOut[i] = 0u
         }
-    }
-
-    fun executeCommand() {
-        if (stopped) {
-            return
-        }
-        val command = commands[mem[PC].first]
-        if (command == null) {
-            PC++
-            return
-        }
-        val description = command.first.split(Regex(", *| +"))
-        when (description[0]) {
-            "MOV" -> writeReg(description[1], readReg(description[2]))
-            "MVI" -> writeReg(description[1], mem[correctValRP(PC + 1)].first)
-            "LXI" -> writeRP(description[1], mem[PC + 2].first, mem[correctValRP(PC + 1)].first)
-            "LDA" -> A = mem[mem[correctValRP(PC + 2)].first.toInt() * 256 +
-                    mem[correctValRP(PC + 1)].first.toInt()].first
-            "LDAX" -> A = mem[RP(description[1])].first
-            "STA" -> {
-                val address = mem[correctValRP(PC + 2)].first.toInt() * 256 +
-                        mem[correctValRP(PC + 1)].first.toInt()
-                mem[address] = A to mem[address].second
-            }
-            "STAX" -> {
-                val address = RP(description[1])
-                mem[address] = A to mem[address].second
-            }
-            "IN" -> A = portsIn[mem[correctValRP(PC + 1)].first.toInt()]
-            "OUT" -> portsOut[mem[correctValRP(PC + 1)].first.toInt()] = A
-            "JMP" -> {
-                PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() * 256
-                return
-            }
-            "CALL" -> {
-                mem[correctValRP(SP - 1)] = (PC / 256).toUByte() to mem[correctValRP(SP - 1)].second
-                mem[correctValRP(SP - 2)] = (PC % 256).toUByte() to mem[correctValRP(SP - 2)].second
-                SP = correctValRP(SP - 2)
-                PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() * 256
-                return
-            }
-            "RET" -> {
-                PC = mem[SP].first.toInt() + mem[correctValRP(SP + 1)].first.toInt() * 256
-                SP = correctValRP(SP + 2)
-                return
-            }
-            "NOP" -> {}
-            "HLT" -> {
-                stopped = true
-                return
-            }
-            "INR" -> writeReg(description[1], (readReg(description[1]) + 1u).toUByte())
-            "INX" -> setRP(description[1], RP(description[1]) + 1)
-            "DCR" -> writeReg(description[1], (readReg(description[1]) - 1u).toUByte())
-            "DCX" -> setRP(description[1], RP(description[1]) - 1)
-            "DAD" -> setRP("H", RP("H") + RP(description[1]))
-            "RLC" -> A = (A * 2u).toUByte()
-            "RRC" -> A = (A / 2u).toUByte()
-            else -> throw Exception("The command ${description[0]} cannot be interpreted")
-        }
-        PC += command.second
-        return
     }
 
     private fun RP(nameRP: String) = when (nameRP) {
@@ -326,6 +286,280 @@ class Processor {
         else -> throw Exception("There is no register named $nameReg")
     }
 
+    fun executeCommand() {
+        if (stopped) {
+            return
+        }
+        val command = commands[mem[PC].first]
+        if (command == null) {
+            PC++
+            return
+        }
+        val description = command.first.split(Regex(", *| +"))
+        fun jmp() {
+            PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() * 256
+        }
+        fun call() {
+            mem[correctValRP(SP - 1)] = (PC / 256).toUByte() to mem[correctValRP(SP - 1)].second
+            mem[correctValRP(SP - 2)] = (PC % 256).toUByte() to mem[correctValRP(SP - 2)].second
+            SP = correctValRP(SP - 2)
+            PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() * 256
+        }
+        fun ret() {
+            PC = mem[SP].first.toInt() + mem[correctValRP(SP + 1)].first.toInt() * 256
+            SP = correctValRP(SP + 2)
+        }
+        fun add(num: UByte, c: Boolean, compare: Boolean) {
+            val prev = A
+            val value = A + num + if (c) 1u else 0u
+            A = value.toUByte()
+            resSigns.writeSZP(A)
+            resSigns.c1 = value >= 256u
+            resSigns.c2 = A % 16u < num % 16u
+            if (compare)
+                A = prev
+        }
+        when (description[0]) {
+            "MOV" -> writeReg(description[1], readReg(description[2]))
+            "MVI" -> writeReg(description[1], mem[correctValRP(PC + 1)].first)
+            "LXI" -> writeRP(description[1], mem[PC + 2].first, mem[correctValRP(PC + 1)].first)
+            "LDA" -> A = mem[mem[correctValRP(PC + 2)].first.toInt() * 256 +
+                    mem[correctValRP(PC + 1)].first.toInt()].first
+            "LDAX" -> A = mem[RP(description[1])].first
+            "STA" -> {
+                val address = mem[correctValRP(PC + 2)].first.toInt() * 256 +
+                        mem[correctValRP(PC + 1)].first.toInt()
+                mem[address] = A to mem[address].second
+            }
+            "STAX" -> {
+                val address = RP(description[1])
+                mem[address] = A to mem[address].second
+            }
+            "IN" -> A = portsIn[mem[correctValRP(PC + 1)].first.toInt()]
+            "OUT" -> portsOut[mem[correctValRP(PC + 1)].first.toInt()] = A
+            "JMP" -> {
+                jmp()
+                return
+            }
+            "CALL" -> {
+                call()
+                return
+            }
+            "RET" -> {
+                ret()
+                return
+            }
+            "PCHL" -> PC = RP("H")
+            "RST" -> {
+                mem[correctValRP(SP - 1)] = (PC / 256).toUByte() to mem[correctValRP(SP - 1)].second
+                mem[correctValRP(SP - 2)] = (PC % 256).toUByte() to mem[correctValRP(SP - 2)].second
+                SP = correctValRP(SP - 2)
+                PC = description[1].toInt() * 8
+            }
+            "JNZ" -> {
+                if (!resSigns.z) {
+                    jmp()
+                    return
+                }
+            }
+            "JZ" -> {
+                if (resSigns.z) {
+                    jmp()
+                    return
+                }
+            }
+            "JNC" -> {
+                if (!resSigns.c1) {
+                    jmp()
+                    return
+                }
+            }
+            "JC" -> {
+                if (resSigns.c1) {
+                    jmp()
+                    return
+                }
+            }
+            "JPO" -> {
+                if (!resSigns.p) {
+                    jmp()
+                    return
+                }
+            }
+            "JPE" -> {
+                if (resSigns.p) {
+                    jmp()
+                    return
+                }
+            }
+            "JP" -> {
+                if (!resSigns.s) {
+                    jmp()
+                    return
+                }
+            }
+            "JM" -> {
+                if (resSigns.s) {
+                    jmp()
+                    return
+                }
+            }
+            "CNZ" -> {
+                if (!resSigns.z) {
+                    call()
+                    return
+                }
+            }
+            "CZ" -> {
+                if (resSigns.z) {
+                    call()
+                    return
+                }
+            }
+            "CNC" -> {
+                if (!resSigns.c1) {
+                    call()
+                    return
+                }
+            }
+            "CC" -> {
+                if (resSigns.c1) {
+                    call()
+                    return
+                }
+            }
+            "CPO" -> {
+                if (!resSigns.p) {
+                    call()
+                    return
+                }
+            }
+            "CPE" -> {
+                if (resSigns.p) {
+                    call()
+                    return
+                }
+            }
+            "CP" -> {
+                if (!resSigns.s) {
+                    call()
+                    return
+                }
+            }
+            "CM" -> {
+                if (resSigns.s) {
+                    call()
+                    return
+                }
+            }
+            "RNZ" -> {
+                if (!resSigns.z) {
+                    ret()
+                    return
+                }
+            }
+            "RZ" -> {
+                if (resSigns.z) {
+                    ret()
+                    return
+                }
+            }
+            "RNC" -> {
+                if (!resSigns.c1) {
+                    ret()
+                    return
+                }
+            }
+            "RC" -> {
+                if (resSigns.c1) {
+                    ret()
+                    return
+                }
+            }
+            "RPO" -> {
+                if (!resSigns.p) {
+                    ret()
+                    return
+                }
+            }
+            "RPE" -> {
+                if (resSigns.p) {
+                    ret()
+                    return
+                }
+            }
+            "RP" -> {
+                if (!resSigns.s) {
+                    ret()
+                    return
+                }
+            }
+            "RM" -> {
+                if (resSigns.s) {
+                    ret()
+                    return
+                }
+            }
+            "NOP" -> {}
+            "HLT" -> {
+                stopped = true
+                return
+            }
+            "ADD" -> add(readReg(description[1]), false, false)
+            "ADI" -> add(mem[correctValRP(PC + 1)].first, false, false)
+            "ADC" -> add(readReg(description[1]), resSigns.c1, false)
+            "ACI" -> add(mem[correctValRP(PC + 1)].first, resSigns.c1, false)
+            "SUB" -> add((256u - readReg(description[1])).toUByte(), false, false)
+            "SUI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), false, false)
+            "SBB" -> add((256u - readReg(description[1])).toUByte(), resSigns.c1, false)
+            "SBI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), resSigns.c1, false)
+            "CMP" -> add((256u - readReg(description[1])).toUByte(), false, true)
+            "CPI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), false, true)
+            "INR" -> {
+                val value2 = (readReg(description[1]) + 1u).toUByte()
+                writeReg(description[1], value2)
+                resSigns.writeSZP(value2)
+                resSigns.c2 = value2 % 16u == 0u
+            }
+            "INX" -> {
+                setRP(description[1], RP(description[1]) + 1)
+            }
+            "DCR" -> {
+                val value2 = (readReg(description[1]) - 1u).toUByte()
+                writeReg(description[1], value2)
+                resSigns.writeSZP(value2)
+                resSigns.c2 = value2 % 16u != 15u
+            }
+            "DCX" -> {
+                setRP(description[1], RP(description[1]) - 1)
+            }
+            "DAD" -> {
+                val value = RP("H") + RP(description[1])
+                setRP("H", value)
+                resSigns.c1 = value >= 256 * 256
+            }
+            "RLC" -> {
+                resSigns.c1 = A / 128u == 1u
+                A = (A * 2u).toUByte()
+            }
+            "RRC" -> {
+                resSigns.c1 = A % 2u == 1u
+                A = (A / 2u).toUByte()
+            }
+            "RAL" -> {
+                resSigns.c1 = A / 128u == 1u
+                A = (A * 2u + if (resSigns.c1) 1u else 0u).toUByte()
+            }
+            "RAR" -> {
+                resSigns.c1 = A % 2u == 1u
+                A = (A / 2u + if (resSigns.c1) 128u else 0u).toUByte()
+            }
+            else -> throw Exception("The command ${description[0]} cannot be interpreted")
+        }
+        PC += command.second
+        return
+    }
+
     private val commands: Map<UByte, Pair<String, Int>> = mapOf(
         0x40 to ("MOV B,B"        to 1),
         0x41 to ("MOV B,C"        to 1),
@@ -427,10 +661,97 @@ class Processor {
         0xC3 to ("JMP data16"    to 3),
         0xCD to ("CALL data16"   to 3),
         0xC9 to ("RET"           to 1),
+        0xE9 to ("PCHL"          to 1),
+        0xC7 to ("RST 0"         to 1),
+        0xCF to ("RST 1"         to 1),
+        0xD7 to ("RST 2"         to 1),
+        0xDF to ("RST 3"         to 1),
+        0xE7 to ("RST 4"         to 1),
+        0xEF to ("RST 5"         to 1),
+        0xF7 to ("RST 6"         to 1),
+        0xFF to ("RST 7"         to 1),
 
+        0xC2 to ("JNZ data16"    to 3),
+        0xCA to ("JZ data16"     to 3),
+        0xD2 to ("JNC data16"    to 3),
+        0xDA to ("JC data16"     to 3),
+        0xE2 to ("JPO data16"    to 3),
+        0xEA to ("JPE data16"    to 3),
+        0xF2 to ("JP data16"     to 3),
+        0xFA to ("JM data16"     to 3),
+
+        0xC4 to ("CNZ data16"    to 3),
+        0xCC to ("CZ data16"     to 3),
+        0xD4 to ("CNC data16"    to 3),
+        0xDC to ("CC data16"     to 3),
+        0xE4 to ("CPO data16"    to 3),
+        0xEC to ("CPE data16"    to 3),
+        0xF4 to ("CP data16"     to 3),
+        0xFC to ("CM data16"     to 3),
+
+        0xC0 to ("RNZ data16"    to 3),
+        0xC8 to ("RZ data16"     to 3),
+        0xD0 to ("RNC data16"    to 3),
+        0xD8 to ("RC data16"     to 3),
+        0xE0 to ("RPO data16"    to 3),
+        0xE8 to ("RPE data16"    to 3),
+        0xF0 to ("RP data16"     to 3),
+        0xF8 to ("RM data16"     to 3),
+
+        0xFB to ("EI"            to 1),
+        0xF3 to ("DI"            to 1),
         0x00 to ("NOP"           to 1),
-
         0x76 to ("HLT"           to 1),
+
+        0x80 to ("ADD B"         to 1),
+        0x81 to ("ADD C"         to 1),
+        0x82 to ("ADD D"         to 1),
+        0x83 to ("ADD E"         to 1),
+        0x84 to ("ADD H"         to 1),
+        0x85 to ("ADD L"         to 1),
+        0x86 to ("ADD M"         to 1),
+        0x87 to ("ADD A"         to 1),
+        0xC6 to ("ADI data8"     to 2),
+
+        0x88 to ("ADC B"         to 1),
+        0x89 to ("ADC C"         to 1),
+        0x8A to ("ADC D"         to 1),
+        0x8B to ("ADC E"         to 1),
+        0x8C to ("ADC H"         to 1),
+        0x8D to ("ADC L"         to 1),
+        0x8E to ("ADC M"         to 1),
+        0x8F to ("ADC A"         to 1),
+        0xCE to ("ACI data8"     to 2),
+
+        0x90 to ("SUB B"         to 1),
+        0x91 to ("SUB C"         to 1),
+        0x92 to ("SUB D"         to 1),
+        0x93 to ("SUB E"         to 1),
+        0x94 to ("SUB H"         to 1),
+        0x95 to ("SUB L"         to 1),
+        0x96 to ("SUB M"         to 1),
+        0x97 to ("SUB A"         to 1),
+        0xD6 to ("SUI data8"     to 2),
+
+        0x98 to ("SBB B"         to 1),
+        0x99 to ("SBB C"         to 1),
+        0x9A to ("SBB D"         to 1),
+        0x9B to ("SBB E"         to 1),
+        0x9C to ("SBB H"         to 1),
+        0x9D to ("SBB L"         to 1),
+        0x9E to ("SBB M"         to 1),
+        0x9F to ("SBB A"         to 1),
+        0xDE to ("SBI data8"     to 2),
+
+        0xB8 to ("CMP B"         to 1),
+        0xB9 to ("CMP C"         to 1),
+        0xBA to ("CMP D"         to 1),
+        0xBB to ("CMP E"         to 1),
+        0xBC to ("CMP H"         to 1),
+        0xBD to ("CMP L"         to 1),
+        0xBE to ("CMP M"         to 1),
+        0xBF to ("CMP A"         to 1),
+        0xFE to ("CPI data8"     to 2),
 
         0x04 to ("INR B"         to 1),
         0x0C to ("INR C"         to 1),
