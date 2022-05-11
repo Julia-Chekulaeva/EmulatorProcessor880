@@ -1,10 +1,17 @@
-base=16 # This is the format of the commands and addresses
-commands_count=1000 # This is the number of commands which will be executed
+base=16     # This is the format of the commands and addresses
+commands_count=200     # This is the number of commands which will be executed
+indic=d     # Write s or d to indicate do you want to use static or dynamic indication
+addresses=0000-0090
 
 0000:
-3E 80 D3 0B 26 00 2E 80 CD 18 00 2E 84 CD 18 00
-2E 88 CD 18 00 C3 06 00 0E 08 6B 3E 01 47 D3 09
-7E D3 08 3E 00 D3 08 2C 78 07 FE 10 C2 1D 00 0D C2 1A 00 C9
+3E 80 D3 0B 26 00 2E 80
+CD 18 00 2E 84 CD 18 00
+2E 88 CD 18 00 C3 06 00
+0E 08 6B 3E 01 47 D3 09
+7E D3 08 3E 00 D3 08 2C
+78 07 FE 10 C2 1D 00 0D
+C2 1A 00 C9 00 00 00 00
 
 0080:
-7C 39 6E 73 7C 66 79 73 73 3F 37 39
+7C 39 6E 73 7C 66 79 73
+73 3F 37 39 00 00 00 00

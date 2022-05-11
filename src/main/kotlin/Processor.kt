@@ -23,9 +23,11 @@ class Processor {
     private val strDigits = Array(7) { StringBuilder(" ".repeat(60)) }
 
     override fun toString(): String {
-        return String.format("BC: %02x %02x\tDE: %02x %02x\tHL: %02x %02x\tM: %02x\tA: %02x\tSP: %04x\tPC: %04x",
-        B.toInt(), C.toInt(), D.toInt(), E.toInt(), H.toInt(), L.toInt(), M().toInt(), A.toInt(), SP, PC) +
-                if (stopped) "\t| The processor is stopped" else ""
+        return String.format(
+            "BC: %02x %02x\tDE: %02x %02x\tHL: %02x %02x\tM: %02x\tA: %02x\tSP: %04x\tPC: %04x\nCommand: %s",
+            B.toInt(), C.toInt(), D.toInt(), E.toInt(), H.toInt(), L.toInt(), M().toInt(), A.toInt(), SP, PC,
+            commands[mem[PC].first]?.first ?: "no command"
+        ) + if (stopped) "\t| The processor is stopped" else ""
     }
 
     fun getInPorts() = portsIn
