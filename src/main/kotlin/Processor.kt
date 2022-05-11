@@ -183,6 +183,8 @@ class Processor {
             "DCR" -> writeReg(description[1], (readReg(description[1]) - 1u).toUByte())
             "DCX" -> setRP(description[1], RP(description[1]) - 1)
             "DAD" -> setRP("H", RP("H") + RP(description[1]))
+            "RLC" -> A = (A * 2u).toUByte()
+            "RRC" -> A = (A / 2u).toUByte()
             else -> throw Exception("The command ${description[0]} cannot be interpreted")
         }
         PC += command.second
