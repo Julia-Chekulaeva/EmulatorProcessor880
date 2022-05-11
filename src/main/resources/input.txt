@@ -4,9 +4,9 @@ indic=d     # Write s or d to indicate do you want to use static or dynamic indi
 addresses=0000-0090
 
 0000:
-3E 80 D3 0B 26 00 2E 80
-CD 18 00 2E 84 CD 18 00
-2E 88 CD 18 00 C3 06 00
+3E 80 D3 0B 26 00 1E 80
+CD 18 00 1E 84 CD 18 00
+1E 88 CD 18 00 C3 06 00
 0E 08 6B 3E 01 47 D3 09
 7E D3 08 3E 00 D3 08 2C
 78 07 FE 10 C2 1D 00 0D
