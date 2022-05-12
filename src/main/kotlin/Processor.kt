@@ -16,7 +16,7 @@ class Processor {
             var value1 = value.toInt()
             for (i in 0 until 8) {
                 sum += value1 % 2
-                value1 = value1 ushr 2
+                value1 /= 2
             }
             p = sum % 2 == 0
         }
@@ -76,26 +76,26 @@ class Processor {
         var code = codeByte.toInt()
         if (code % 2 == 1)
             modifyStrArrayHorisontal(indic, 0)
-        code = code ushr 2
+        code /= 2
         if (code % 2 == 1)
             modifyStrArrayVertical(indic, 1, 6)
-        code = code ushr 2
+        code /= 2
         if (code % 2 == 1)
             modifyStrArrayVertical(indic, 4, 6)
-        code = code ushr 2
+        code /= 2
         if (code % 2 == 1)
             modifyStrArrayHorisontal(indic, 6)
-        code = code ushr 2
+        code /= 2
         if (code % 2 == 1)
             modifyStrArrayVertical(indic, 4, 1)
-        code = code ushr 2
+        code /= 2
         if (code % 2 == 1)
             modifyStrArrayVertical(indic, 1, 1)
-        code = code ushr 2
+        code /= 2
         if (code % 2 == 1)
             modifyStrArrayHorisontal(indic, 3)
-        code = code ushr 2
-        if (code == 1)
+        code /= 2
+        if (code % 2 == 1)
             strDigits[6][indic + 8] = '8'
     }
 
@@ -154,9 +154,9 @@ class Processor {
     }
 
     private fun RP(nameRP: String) = when (nameRP) {
-        "B" -> B.toInt() shl 8 + C.toInt()
-        "D" -> D.toInt() shl 8 + E.toInt()
-        "H" -> H.toInt() shl 8 + L.toInt()
+        "B" -> (B * 256u + C).toInt()
+        "D" -> (D * 256u + E).toInt()
+        "H" -> (H * 256u + L).toInt()
         "SP" -> SP
         else -> throw Exception("There is no RP named $nameRP")
     }
@@ -219,7 +219,7 @@ class Processor {
                 H = value1
                 L = value0
             }
-            "SP" -> SP = value1.toInt() shl 8 + value0.toInt()
+            "SP" -> SP = value1.toInt() * 256 + value0.toInt()
             else -> throw Exception("There is no RP named $nameRP")
         }
     }
@@ -233,16 +233,16 @@ class Processor {
         val correctedValue = correctValRP(value)
         when (nameRP) {
             "B" -> {
-                B = (correctedValue ushr 8).toUByte()
-                C = correctedValue.toUByte()
+                B = (correctedValue / 256).toUByte()
+                C = (correctedValue % 256).toUByte()
             }
             "D" -> {
-                D = (correctedValue ushr 8).toUByte()
-                E = correctedValue.toUByte()
+                D = (correctedValue / 256).toUByte()
+                E = (correctedValue % 256).toUByte()
             }
             "H" -> {
-                H = (correctedValue ushr 8).toUByte()
-                L = correctedValue.toUByte()
+                H = (correctedValue / 256).toUByte()
+                L = (correctedValue % 256).toUByte()
             }
             "SP" -> SP = correctedValue
             else -> throw Exception("There is no RP named $nameRP")
@@ -253,7 +253,7 @@ class Processor {
         "B" -> B to C
         "D" -> D to E
         "H" -> H to L
-        "SP" -> (SP ushr 8).toUByte() to SP.toUByte()
+        "SP" -> (SP / 256).toUByte() to (SP % 256).toUByte()
         else -> throw Exception("There is no RP named $nameRP")
     }
 
@@ -297,16 +297,16 @@ class Processor {
         }
         val description = command.first.split(Regex(", *| +"))
         fun jmp() {
-            PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() shl 8
+            PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() * 256
         }
         fun call() {
-            mem[correctValRP(SP - 1)] = (PC ushr 8).toUByte() to mem[correctValRP(SP - 1)].second
-            mem[correctValRP(SP - 2)] = PC.toUByte() to mem[correctValRP(SP - 2)].second
+            mem[correctValRP(SP - 1)] = (PC / 256).toUByte() to mem[correctValRP(SP - 1)].second
+            mem[correctValRP(SP - 2)] = (PC % 256).toUByte() to mem[correctValRP(SP - 2)].second
             SP = correctValRP(SP - 2)
-            PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() shl 8
+            PC = mem[correctValRP(PC + 1)].first.toInt() + mem[correctValRP(PC + 2)].first.toInt() * 256
         }
         fun ret() {
-            PC = mem[SP].first.toInt() + mem[correctValRP(SP + 1)].first.toInt() shl 8
+            PC = mem[SP].first.toInt() + mem[correctValRP(SP + 1)].first.toInt() * 256
             SP = correctValRP(SP + 2)
         }
         fun add(num: UByte, c: Boolean, compare: Boolean) {
@@ -323,11 +323,11 @@ class Processor {
             "MOV" -> writeReg(description[1], readReg(description[2]))
             "MVI" -> writeReg(description[1], mem[correctValRP(PC + 1)].first)
             "LXI" -> writeRP(description[1], mem[PC + 2].first, mem[correctValRP(PC + 1)].first)
-            "LDA" -> A = mem[mem[correctValRP(PC + 2)].first.toInt() shl 8 +
+            "LDA" -> A = mem[mem[correctValRP(PC + 2)].first.toInt() * 256 +
                     mem[correctValRP(PC + 1)].first.toInt()].first
             "LDAX" -> A = mem[RP(description[1])].first
             "STA" -> {
-                val address = mem[correctValRP(PC + 2)].first.toInt() shl 8 +
+                val address = mem[correctValRP(PC + 2)].first.toInt() * 256 +
                         mem[correctValRP(PC + 1)].first.toInt()
                 mem[address] = A to mem[address].second
             }
@@ -351,10 +351,10 @@ class Processor {
             }
             "PCHL" -> PC = RP("H")
             "RST" -> {
-                mem[correctValRP(SP - 1)] = (PC ushr 8).toUByte() to mem[correctValRP(SP - 1)].second
-                mem[correctValRP(SP - 2)] = PC.toUByte() to mem[correctValRP(SP - 2)].second
+                mem[correctValRP(SP - 1)] = (PC / 256).toUByte() to mem[correctValRP(SP - 1)].second
+                mem[correctValRP(SP - 2)] = (PC % 256).toUByte() to mem[correctValRP(SP - 2)].second
                 SP = correctValRP(SP - 2)
-                PC = description[1].toInt() shl 3
+                PC = description[1].toInt() * 8
             }
             "JNZ" -> {
                 if (!resSigns.z) {
@@ -505,16 +505,16 @@ class Processor {
                 stopped = true
                 return
             }
-            "ADD" -> add(readReg(description[1]), c=false, compare = false)
-            "ADI" -> add(mem[correctValRP(PC + 1)].first, c=false, compare = false)
+            "ADD" -> add(readReg(description[1]), false, false)
+            "ADI" -> add(mem[correctValRP(PC + 1)].first, false, false)
             "ADC" -> add(readReg(description[1]), resSigns.c1, false)
             "ACI" -> add(mem[correctValRP(PC + 1)].first, resSigns.c1, false)
-            "SUB" -> add((256u - readReg(description[1])).toUByte(), c=false, compare = false)
-            "SUI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), c=false, compare = false)
+            "SUB" -> add((256u - readReg(description[1])).toUByte(), false, false)
+            "SUI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), false, false)
             "SBB" -> add((256u - readReg(description[1])).toUByte(), resSigns.c1, false)
             "SBI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), resSigns.c1, false)
-            "CMP" -> add((256u - readReg(description[1])).toUByte(), c=false, compare = true)
-            "CPI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), c=false, compare = true)
+            "CMP" -> add((256u - readReg(description[1])).toUByte(), false, true)
+            "CPI" -> add((256u - mem[correctValRP(PC + 1)].first).toUByte(), false, true)
             "INR" -> {
                 val value2 = (readReg(description[1]) + 1u).toUByte()
                 writeReg(description[1], value2)
@@ -538,46 +538,21 @@ class Processor {
                 setRP("H", value)
                 resSigns.c1 = value >= 256 * 256
             }
-            "DAA" -> TODO()
-            "ANA" -> {
-                A = A and readReg(description[1])
-                resSigns.writeSZP(A)
-            }
-            "ANI" -> {
-                A = A and mem[correctValRP(PC + 1)].first
-                resSigns.writeSZP(A)
-            }
-            "XRA" -> {
-                A = A xor readReg(description[1])
-                resSigns.writeSZP(A)
-            }
-            "XRI" -> {
-                A = A xor mem[correctValRP(PC + 1)].first
-                resSigns.writeSZP(A)
-            }
-            "ORA" -> {
-                A = A or readReg(description[1])
-                resSigns.writeSZP(A)
-            }
-            "ORI" -> {
-                A = A or mem[correctValRP(PC + 1)].first
-                resSigns.writeSZP(A)
-            }
             "RLC" -> {
                 resSigns.c1 = A / 128u == 1u
-                A = (A.toInt() shl 1).toUByte()
+                A = (A * 2u).toUByte()
             }
             "RRC" -> {
                 resSigns.c1 = A % 2u == 1u
-                A = (A.toInt() ushr 1).toUByte()
+                A = (A / 2u).toUByte()
             }
             "RAL" -> {
                 resSigns.c1 = A / 128u == 1u
-                A = (A.toInt() shl 1 + if (resSigns.c1) 1 else 0).toUByte()
+                A = (A * 2u + if (resSigns.c1) 1u else 0u).toUByte()
             }
             "RAR" -> {
                 resSigns.c1 = A % 2u == 1u
-                A = (A.toInt() ushr 1 + if (resSigns.c1) 128 else 0).toUByte()
+                A = (A / 2u + if (resSigns.c1) 128u else 0u).toUByte()
             }
             else -> throw Exception("The command ${description[0]} cannot be interpreted")
         }
@@ -813,36 +788,7 @@ class Processor {
 
         0x27 to ("DAA"           to 1),
 
-        0xA0 to ("ANA B"         to 1),
-        0xA1 to ("ANA C"         to 1),
-        0xA2 to ("ANA D"         to 1),
-        0xA3 to ("ANA E"         to 1),
-        0xA4 to ("ANA H"         to 1),
-        0xA5 to ("ANA L"         to 1),
-        0xA6 to ("ANA M"         to 1),
-        0xA7 to ("ANA A"         to 1),
-        0xE6 to ("ANI data8"     to 2),
-
-        0xA8 to ("XRA B"         to 1),
-        0xA9 to ("XRA C"         to 1),
-        0xAA to ("XRA D"         to 1),
-        0xAB to ("XRA E"         to 1),
-        0xAC to ("XRA H"         to 1),
-        0xAD to ("XRA L"         to 1),
-        0xAE to ("XRA M"         to 1),
-        0xAF to ("XRA A"         to 1),
-        0xEE to ("XRI data8"     to 2),
-
-        0xB0 to ("ORA B"         to 1),
-        0xB1 to ("ORA C"         to 1),
-        0xB2 to ("ORA D"         to 1),
-        0xB3 to ("ORA E"         to 1),
-        0xB4 to ("ORA H"         to 1),
-        0xB5 to ("ORA L"         to 1),
-        0xB6 to ("ORA M"         to 1),
-        0xB7 to ("ORA A"         to 1),
         0xF6 to ("ORI data8"     to 2),
-
         0x2F to ("CMA"           to 1),
 
         0x07 to ("RLC"           to 1),

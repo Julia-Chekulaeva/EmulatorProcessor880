@@ -1,6 +1,5 @@
 import java.io.BufferedWriter
 import java.io.File
-import java.lang.Thread.sleep
 
 fun main(args: Array<String>) {
     val lines = File("src\\main\\resources\\input.txt").readLines().map {
@@ -58,7 +57,6 @@ fun main(args: Array<String>) {
         }
         printAndWrite(".".repeat(60), output)
         processor.executeCommand()
-        sleep(100)
     }
     processor.readMem(startAddress, endAddress).forEach {
         printAndWrite(it, output)
